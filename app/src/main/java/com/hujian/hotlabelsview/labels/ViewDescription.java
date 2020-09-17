@@ -16,6 +16,25 @@ public  class ViewDescription{
     int top;
     int right;
     int bottom;
+    int position ;
+    int height;
+    int wight;
+
+    public int getHeight() {
+        return height;
+    }
+
+    public void setHeight(int height) {
+        this.height = height;
+    }
+
+    public int getWight() {
+        return wight;
+    }
+
+    public void setWight(int wight) {
+        this.wight = wight;
+    }
 
     public View getView() { return view; }
 
@@ -37,6 +56,13 @@ public  class ViewDescription{
 
     public void setBottom(int bottom) { this.bottom = bottom; }
 
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
+    }
 
     public ViewDescription() {}
 
@@ -48,7 +74,8 @@ public  class ViewDescription{
         this.bottom = bottom;
     }
 
-    @Override public String toString() {
-        return "ViewDescription{left=" + left + ", top=" + top + ", right=" + right + ", bottom=" + bottom + '}';
+    @Override
+    public String toString() {
+        return "ViewDescription{" + "view=" + view + ", left=" + left + ", top=" + top + ", right=" + right + ", bottom=" + bottom + ", position=" + position + ", height=" + height + ", wight=" + wight + '}';
     }
 }

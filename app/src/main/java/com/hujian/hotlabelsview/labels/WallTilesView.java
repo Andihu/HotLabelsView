@@ -2,7 +2,7 @@ package com.hujian.hotlabelsview.labels;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.util.Log;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -19,21 +19,19 @@ import java.util.List;
  */
 public class WallTilesView<T> extends ViewGroup {
     private static final String TAG = "WallTilesView";
+    private static final int CENTER=1;
+    private static final int TOP=2;
+    private static final int BOTTOM=3;
+    private static int POSITION = CENTER;
 
     private List<T> dates;
-
-    private int mHorizontalSpace = 24;
-
-    private int mVerticalSpace = 24;
-
-    private int mMaxLine = 3;
-
+    private int mHorizontalSpace = 0;
+    private int mVerticalSpace = 0;
+    private int mMaxLine = -1;
     private int mMaxCounts = -1;
-
+    private int mOpen;
     List<ViewDescription> children = new ArrayList<>();
-
     private OnItemClickListener mOnItemClickListener;
-
     public WallTilesView(Context context) {
         this(context, null);
     }
@@ -52,21 +50,13 @@ public class WallTilesView<T> extends ViewGroup {
         addItem(viewProvider);
     }
 
-    public void setHorizontalSpace(int horizontalSpace) {
-        mHorizontalSpace = horizontalSpace;
-    }
+    public void setHorizontalSpace(int horizontalSpace) { mHorizontalSpace = dp2sp(getContext(),horizontalSpace); }
 
-    public void setVerticalSpace(int verticalSpace) {
-        mVerticalSpace = verticalSpace;
-    }
+    public void setVerticalSpace(int verticalSpace) { mVerticalSpace = dp2sp(getContext(),verticalSpace); }
 
-    public void setMaxCounts(int maxCounts) {
-        mMaxCounts = maxCounts;
-    }
+    public void setMaxCounts(int maxCounts) { mMaxCounts = maxCounts; }
 
-    public void setMaxLine(int maxLine) {
-        mMaxLine = maxLine;
-    }
+    public void setMaxLine(int maxLine) { mMaxLine = maxLine; }
 
     public void setOnItemClickListener(OnItemClickListener onItemClickListener) {
         this.mOnItemClickListener = onItemClickListener;
@@ -74,13 +64,17 @@ public class WallTilesView<T> extends ViewGroup {
 
     private void addItem(ViewProvider viewProvider) {
         for (final T date : dates) {
-            viewProvider.getView(date).setOnClickListener(new OnClickListener() {
+            View view = viewProvider.getView(date);
+            view.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    mOnItemClickListener.onClick(date);
+                    if (mOnItemClickListener != null) {
+                        mOnItemClickListener.onClick(date);
+                    }
                 }
             });
-            addView(viewProvider.getView(date));
+            viewProvider.bindView(this,view,date);
+            addView(view);
             children.add(new ViewDescription());
         }
     }
@@ -99,6 +93,7 @@ public class WallTilesView<T> extends ViewGroup {
         int lineCount = 0;
         for (int i = 0; i < count; i++) {
             View child = getChildAt(i);
+
             measureChild(child, widthMeasureSpec, heightMeasureSpec);
             //第一行的时候
             if (i == 0) {
@@ -111,8 +106,14 @@ public class WallTilesView<T> extends ViewGroup {
              */
             left = (left == 0 ? 0 : left + mHorizontalSpace);
             // 换行
-            if (left + child.getMeasuredWidth() > getMeasuredWidth()) {
-                lineCount++;
+            if (left + child.getMeasuredWidth()> getMeasuredWidth()) {
+
+                beforeBottom = setViewPosition(lineCount);
+
+                lineCount ++;
+                if ((mMaxLine > 0 && lineCount > (mMaxLine-1)) || (mMaxCounts > 0 && i > mMaxCounts)) {
+                    continue;
+                }
                 isHH = true;
                 left = 0;
                 top = beforeBottom == 0 ? 0 : (beforeBottom + mVerticalSpace); // 上一层控件的底部作为当前控件的顶部
@@ -126,14 +127,14 @@ public class WallTilesView<T> extends ViewGroup {
             children.get(i).setTop(top);
             children.get(i).setBottom(top + child.getMeasuredHeight());
             children.get(i).setView(child);
+            children.get(i).setPosition(lineCount);
+            children.get(i).setWight(child.getMeasuredWidth());
+            children.get(i).setHeight(child.getMeasuredHeight());
             left += child.getMeasuredWidth();
             if (left > totalWidth) { // 当宽度为WRAP_CONTENT时，取宽度最大的一行
                 totalWidth = left;
             }
-            if ((mMaxLine > 0 && lineCount > mMaxLine) || (mMaxCounts > 0 && i > mMaxCounts)) {
-                children.remove(i);
-                continue;
-            }
+
         }
 
         int height = 0;
@@ -152,19 +153,61 @@ public class WallTilesView<T> extends ViewGroup {
         setMeasuredDimension(width, height);
     }
 
+    private int setViewPosition(int lineCount) {
+        List<ViewDescription> descriptions = new ArrayList<>();
+        for (ViewDescription child : children) {
+            if (child.position==lineCount){
+
+                descriptions.add(child);
+            }
+        }
+        int maxHeight = 0;
+        int top = 0;
+        for (ViewDescription description : descriptions) {
+            top = description.top;
+            if (description.getHeight()>=maxHeight){
+                maxHeight = description.getHeight();
+            }
+        }
+        for (ViewDescription child : children) {
+            if (child.position==lineCount){
+                if (child.getHeight()<maxHeight){
+                    switch (POSITION){
+                        case TOP:
+                            break;
+                        case CENTER:
+                            child.setTop(top+maxHeight/2-child.getHeight()/2);
+                            child.setBottom(top+maxHeight/2+child.getHeight()/2);
+                            break;
+                        case BOTTOM:
+                            child.setTop(top+maxHeight-child.getHeight());
+                            child.setBottom(top+maxHeight);
+                            break;
+                    }
+                }
+            }
+        }
+        return top+maxHeight;
+    }
+
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        Log.e(TAG, "onLayout: " + children.toString());
         for (ViewDescription child : children) {
-            child.getView().layout(child.getLeft(), child.getTop(), child.getRight(), child.getBottom());
+            if (child.getView() != null) child.getView().layout(child.getLeft(), child.getTop(), child.getRight(), child.getBottom());
         }
     }
 
     public interface ViewProvider<T> {
         View getView(T t);
+
+        void bindView(View parent,View view, T t);
     }
 
     public interface OnItemClickListener<T> {
         void onClick(T t);
+    }
+
+    public static int dp2sp(Context context,float dpVal) {
+        return (int) (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dpVal, context.getResources().getDisplayMetrics()));
     }
 }
